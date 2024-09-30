@@ -1,0 +1,411 @@
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox, scrolledtext
+import requests
+from bs4 import BeautifulSoup
+from collections import Counter
+
+def get_latest_issue_number(url='http://datachart.500.com/ssq/'):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.content, 'html.parser')
+        input_tag = soup.find('input', {'name': 'to'})
+        latest_issue = int(input_tag['value'])
+        return latest_issue
+
+    except requests.RequestException as e:
+        print(f"请求错误: {e}")
+    except (TypeError, ValueError) as e:
+        print(f"解析错误: {e}")
+
+def fetch_lottery_data():
+    try:
+        period = int(entry_period.get())
+        if period <= 0:
+            messagebox.showerror("错误", "请输入一个正整数期数！")
+            return
+
+        latest_issue = get_latest_issue_number('https://datachart.500.com/dlt/')
+
+        start_issue = latest_issue - period + 1
+        end_issue = latest_issue
+        url = f'http://datachart.500.com/dlt/history/newinc/history.php?start={start_issue:05d}&end={end_issue:05d}'
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.encoding = 'utf-8'
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        lottery_data = []
+
+        for tr in soup.find('tbody', id="tdata").find_all('tr'):
+            tds = tr.find_all('td')
+            if tds:
+                row_data = [td.text.strip() for td in tds]
+                lottery_data.append(row_data)
+
+        result_text = ""
+        max_front_length = max([len(' '.join(map(lambda x: f'{int(x):02d}', row[1:6]))) for row in lottery_data])
+
+        for i in range(min(period, len(lottery_data))):
+            index = -i - 1
+            formatted_fronts = ' '.join(map(lambda x: f'{int(x):02d}', lottery_data[index][1:6]))
+            aligned_fronts = formatted_fronts.ljust(max_front_length + 1)
+            formatted_rear = f'{int(lottery_data[index][6]):02d}'
+            result_text += f"第{lottery_data[index][0]}期: 前区 {aligned_fronts}, 后区 {formatted_rear}\n"
+
+        text_result.config(state=tk.NORMAL)
+        text_result.delete(1.0, tk.END)
+        text_result.insert(tk.END, result_text)
+        text_result.config(state=tk.DISABLED)
+    except ValueError:
+        messagebox.showerror("错误", "请输入有效的整数期数！")
+
+def fetch_double_color_ball_data():
+    try:
+        period = int(entry_period.get())
+        if period <= 0:
+            messagebox.showerror("错误", "请输入一个正整数期数！")
+            return
+
+        latest_issue = get_latest_issue_number()
+
+        start_issue = latest_issue - period + 1
+        end_issue = latest_issue
+        url = f'http://datachart.500.com/ssq/history/newinc/history.php?start={start_issue:05d}&end={end_issue:05d}'
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.encoding = 'gbk'
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        lottery_data = []
+
+        for tr in soup.find('tbody', id="tdata").find_all('tr'):
+            tds = tr.find_all('td')
+            if tds:
+                row_data = [td.text.strip() for td in tds]
+                lottery_data.append(row_data)
+
+        result_text = ""
+        max_red_length = max([len(' '.join(map(lambda x: f'{int(x):02d}', row[1:7]))) for row in lottery_data])
+
+        for i in range(min(period, len(lottery_data))):
+            index = -i - 1
+            formatted_reds = ' '.join(map(lambda x: f'{int(x):02d}', lottery_data[index][1:7]))
+            aligned_reds = formatted_reds.ljust(max_red_length + 1)
+            formatted_blue = f'{int(lottery_data[index][7]):02d}'
+            result_text += f"第{lottery_data[index][0]}期: 红球 {aligned_reds}, 蓝球 {formatted_blue}\n"
+
+        text_result.config(state=tk.NORMAL)
+        text_result.delete(1.0, tk.END)
+        text_result.insert(tk.END, result_text)
+        text_result.config(state=tk.DISABLED)
+    except ValueError:
+        messagebox.showerror("错误", "请输入有效的整数期数！")
+
+def analyze_lotto_data():
+    try:
+        period = int(entry_period.get())
+        if period <= 0:
+            messagebox.showerror("错误", "请输入一个正整数期数！")
+            return
+
+        latest_issue = get_latest_issue_number()
+
+        start_issue = latest_issue - period + 1
+        end_issue = latest_issue
+        url = f'http://datachart.500.com/ssq/history/newinc/history.php?start={start_issue:05d}&end={end_issue:05d}'
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.encoding = 'gbk'
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        lottery_data = []
+
+        for tr in soup.find('tbody', id="tdata").find_all('tr'):
+            tds = tr.find_all('td')
+            if tds:
+                row_data = [td.text.strip() for td in tds]
+                lottery_data.append(row_data)
+
+        analysis_text = ""
+
+        # 历史数据分析
+        red_balls = [list(map(int, row[1:7])) for row in lottery_data]
+        blue_balls = [int(row[7]) for row in lottery_data]
+
+        analysis_text += "历史数据分析:\n"
+        analysis_text += f"总期数: {len(lottery_data)}\n"
+
+        # 计算红球和蓝球的冷热状态
+        red_ball_counts = Counter(sum(red_balls, []))  # 将二维列表扁平化
+        blue_ball_counts = Counter(blue_balls)
+
+        most_common_red_balls = red_ball_counts.most_common(5)
+        least_common_red_balls = red_ball_counts.most_common()[-5:]
+        most_common_blue_balls = blue_ball_counts.most_common(5)
+        least_common_blue_balls = blue_ball_counts.most_common()[-5:]
+
+        analysis_text += f"最热的红球: {most_common_red_balls}\n"
+        analysis_text += f"最冷的红球: {least_common_red_balls}\n"
+        analysis_text += f"最热的蓝球: {most_common_blue_balls}\n"
+        analysis_text += f"最冷的蓝球: {least_common_blue_balls}\n"
+
+        analysis_text += f"红球大小比: {sum([sum(x > 16 for x in row) for row in red_balls])}/{sum([sum(x <= 16 for x in row) for row in red_balls])}\n"
+        analysis_text += f"红球奇偶比: {sum([sum(x % 2 != 0 for x in row) for row in red_balls])}/{sum([sum(x % 2 == 0 for x in row) for row in red_balls])}\n"
+        analysis_text += f"红球012路比: {sum([sum(x % 3 == 0 for x in row) for row in red_balls])}/{sum([sum(x % 3 == 1 for x in row) for row in red_balls])}/{sum([sum(x % 3 == 2 for x in row) for row in red_balls])}\n"
+        analysis_text += "\n"
+
+        # 走势图分析
+        analysis_text += "走势图分析:\n"
+
+        # 跨度变化趋势
+        spans = [max(row) - min(row) for row in red_balls]
+        analysis_text += f"跨度变化趋势: {sorted(spans, reverse=True)[:5]}\n"
+
+        # 号码趋势
+        # 计算每期号码的变化情况
+        prev_row = None
+        changes = []
+        for row in red_balls:
+            if prev_row is not None:
+                change = sum(abs(a - b) for a, b in zip(prev_row, row))
+                changes.append(change)
+            prev_row = row
+        analysis_text += f"号码趋势: {sorted(changes, reverse=True)[:5]}\n"
+        analysis_text += "\n"
+
+        # 定位分析
+        analysis_text += "定位分析:\n"
+
+        # 龙头号码偏好
+        first_numbers = [row[0] for row in red_balls]
+        first_number_counts = Counter(first_numbers)
+        most_common_first_numbers = first_number_counts.most_common(5)
+        analysis_text += f"龙头号码偏好: {most_common_first_numbers}\n"
+
+        # 凤尾号码偏好
+        last_numbers = [row[-1] for row in red_balls]
+        last_number_counts = Counter(last_numbers)
+        most_common_last_numbers = last_number_counts.most_common(5)
+        analysis_text += f"凤尾号码偏好: {most_common_last_numbers}\n"
+        analysis_text += "\n"
+
+        # 和值分析
+        analysis_text += "和值分析:\n"
+        analysis_text += f"和值变化趋势: {sorted([sum(row) for row in red_balls], reverse=True)[:5]}\n"
+        analysis_text += "\n"
+
+        # 跨度分析
+        analysis_text += "跨度分析:\n"
+        analysis_text += f"跨度变化趋势: {sorted(spans, reverse=True)[:5]}\n"
+        analysis_text += "\n"
+
+        # 遗漏值分析
+        analysis_text += "遗漏值分析:\n"
+
+        # 统计每个号码最近一次出现的期数
+        red_ball_leakage = {}
+        for number in set(sum(red_balls, [])):
+            last_seen = max([i for i, row in enumerate(red_balls) if number in row])
+            leakage = period - last_seen
+            red_ball_leakage[number] = leakage
+
+        most_leaked_red_balls = sorted(red_ball_leakage.items(), key=lambda x: x[1], reverse=True)[:5]
+        analysis_text += f"遗漏值较高的号码: {most_leaked_red_balls}\n"
+        analysis_text += "\n"
+
+        # 蓝球分析
+        analysis_text += "蓝球分析:\n"
+        analysis_text += f"蓝球大小比: {sum([x > 8 for x in blue_balls])}/{sum([x <= 8 for x in blue_balls])}\n"
+        analysis_text += f"蓝球奇偶比: {sum([x % 2 != 0 for x in blue_balls])}/{sum([x % 2 == 0 for x in blue_balls])}\n"
+        analysis_text += f"蓝球冷热状态: {most_common_blue_balls}\n"
+
+        text_result.config(state=tk.NORMAL)
+        text_result.delete(1.0, tk.END)
+        text_result.insert(tk.END, analysis_text)
+        text_result.config(state=tk.DISABLED)
+    except ValueError:
+        messagebox.showerror("错误", "请输入有效的整数期数！")
+
+def analyze_dlt_data():
+    try:
+        period = int(entry_period.get())
+        if period <= 0:
+            messagebox.showerror("错误", "请输入一个正整数期数！")
+            return
+
+        latest_issue = get_latest_issue_number('https://datachart.500.com/dlt/')
+
+        start_issue = latest_issue - period + 1
+        end_issue = latest_issue
+        url = f'http://datachart.500.com/dlt/history/newinc/history.php?start={start_issue:05d}&end={end_issue:05d}'
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.encoding = 'utf-8'
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        lottery_data = []
+
+        for tr in soup.find('tbody', id="tdata").find_all('tr'):
+            tds = tr.find_all('td')
+            if tds:
+                row_data = [td.text.strip() for td in tds]
+                lottery_data.append(row_data)
+
+        analysis_text = ""
+
+        # 历史数据分析
+        front_balls = [list(map(int, row[1:6])) for row in lottery_data]
+        rear_balls = [list(map(int, row[6:8])) for row in lottery_data]  # 确保这里提取的是列表
+
+        analysis_text += "历史数据分析:\n"
+        analysis_text += f"总期数: {len(lottery_data)}\n"
+
+        # 计算前区号码的冷热状态
+        front_ball_counts = Counter(sum(front_balls, []))  # 将二维列表扁平化
+        most_common_front_balls = front_ball_counts.most_common(5)
+        least_common_front_balls = front_ball_counts.most_common()[-5:]
+
+        # 计算后区号码的冷热状态
+        rear_ball_counts = Counter(sum(rear_balls, []))  # 使用扁平化的列表来计数
+        most_common_rear_balls = rear_ball_counts.most_common(5)
+        least_common_rear_balls = rear_ball_counts.most_common()[-5:]
+
+        analysis_text += f"最热的前区号码: {most_common_front_balls}\n"
+        analysis_text += f"最冷的前区号码: {least_common_front_balls}\n"
+        analysis_text += f"最热的后区号码: {most_common_rear_balls}\n"
+        analysis_text += f"最冷的后区号码: {least_common_rear_balls}\n"
+
+        analysis_text += f"前区号码大小比: {sum([sum(x > 17 for x in row) for row in front_balls])}/{sum([sum(x <= 17 for x in row) for row in front_balls])}\n"
+        analysis_text += f"前区号码奇偶比: {sum([sum(x % 2 != 0 for x in row) for row in front_balls])}/{sum([sum(x % 2 == 0 for x in row) for row in front_balls])}\n"
+        analysis_text += f"前区号码012路比: {sum([sum(x % 3 == 0 for x in row) for row in front_balls])}/{sum([sum(x % 3 == 1 for x in row) for row in front_balls])}/{sum([sum(x % 3 == 2 for x in row) for row in front_balls])}\n"
+        analysis_text += "\n"
+
+        # 跨度变化趋势
+        spans = [max(row) - min(row) for row in front_balls]
+        analysis_text += f"前区号码跨度变化趋势: {sorted(spans, reverse=True)[:5]}\n"
+
+        # 号码趋势
+        prev_row = None
+        changes = []
+        for row in front_balls:
+            if prev_row is not None:
+                change = sum(abs(a - b) for a, b in zip(prev_row, row))
+                changes.append(change)
+            prev_row = row
+        analysis_text += f"前区号码变化趋势: {sorted(changes, reverse=True)[:5]}\n"
+        analysis_text += "\n"
+
+        # 遗漏值分析
+        analysis_text += "遗漏值分析:\n"
+
+        # 统计每个号码最近一次出现的期数
+        front_ball_leakage = {}
+        for number in set(sum(front_balls, [])):
+            last_seen = max([i for i, row in enumerate(front_balls) if number in row])
+            leakage = period - last_seen
+            front_ball_leakage[number] = leakage
+
+        most_leaked_front_balls = 排序(front_ball_leakage.items(), key=lambda x: x[1], reverse=True)[:5]
+        analysis_text += f"前区遗漏值较高的号码: {most_leaked_front_balls}\n"
+        analysis_text += "\n"
+
+        # 后区号码遗漏值分析
+        rear_ball_leakage = {}
+        for number in set(sum(rear_balls, [])):
+            last_seen = max([i for i, row in enumerate(rear_balls) if number in row])
+            leakage = period - last_seen
+            rear_ball_leakage[number] = leakage
+
+        most_leaked_rear_balls = sorted(rear_ball_leakage.items(), key=lambda x: x[1], reverse=True)[:5]
+        analysis_text += f"后区遗漏值较高的号码: {most_leaked_rear_balls}\n"
+        analysis_text += "\n"
+
+        text_result.config(state=tk.NORMAL)
+        text_result.delete(1.0, tk.END)
+        text_result.insert(tk.END, analysis_text)
+        text_result.config(state=tk.DISABLED)
+    except ValueError:
+        messagebox.showerror("错误", "请输入有效的整数期数！")
+
+def copy_to_clipboard():
+    root.clipboard_clear()
+    root.clipboard_append(text_result.get("1.0", tk.END))
+    messagebox.showinfo("提示", "结果已复制到剪贴板！")
+
+def center_window(root, width, height):
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+    root.geometry(f"{width}x{height}+{x}+{y}")
+
+root = tk.Tk()
+root.title("彩票查询")
+root.configure(bg="#F0F0F0")
+
+style = ttk.Style()
+style.theme_use('clam')  # 更换主题风格
+style.configure('.', background='#F0F0F0', foreground='black')
+
+# 创建主框架
+main_frame = tk.Frame(root, bg="#FFFFFF")
+main_frame.pack(pady=20, padx=20)
+
+# 输入期数标签和文本框框架
+input_frame = tk.Frame(main_frame, bg="#FFFFFF")
+input_frame.grid(row=0, column=0, columnspan=2)
+
+label_period = tk.Label(input_frame, text="输入期数:", font=("Arial", 12), bg="#FFFFFF")
+label_period.grid(行=0, 列=0, Sticky="e", padx=(0, 10))
+
+Entry_period = tk.Entry(input_frame, font=("Arial", 12), bg="#FFFFFF")
+Entry_period.grid(行=0,列=1,粘性=“w”,padx=(0, 10))
+
+# 按钮框架
+Button_frame = tk.Frame(main_frame, bg="#FFFFFF")
+Button_frame.grid(行=1，列=0，列跨度=2)
+
+Button_fetch_dlt = tk.Button(button_frame, text="查询大乐透", command=fetch_lottery_data, bg="#ECECEC", fg="#333333", font=("Arial", 12))
+Button_fetch_dlt.grid（行=0，列=0，padx=5，pady=5）
+
+Button_fetch_dcq = tk.Button(button_frame, text="查询双色球", command=fetch_double_color_ball_data, bg="#ECECEC", fg="#333333", font=("Arial", 12))
+Button_fetch_dcq.grid（行=0，列=1，padx=5，pady=5）
+
+Button_analyze_dlt = tk.Button(button_frame, text="分析大乐透", command=analyze_dlt_data, bg="#ECECEC", fg="#333333", font=("Arial", 12))
+Button_analyze_dlt.grid(行=1，列=0，padx=5，pady=5)
+
+Button_analyze_dcq = tk.Button(button_frame, text="分析双色球", command=analyze_lotto_data, bg="#ECECEC", fg="#333333", font=("Arial", 12))(Button_frame, text="分析双色球", command=analyze_lotto_data, bg="#ECECEC", fg="#333333", font=("Arial", 12))
+Button_analyze_dcq.grid(行=1，列=1，padx=5，pady=5)
+
+Button_copy = tk.Button(button_frame, text="复制结果", command=copy_to_clipboard, bg="#ECECEC", fg="#333333", font=("Arial", 12))
+Button_copy.grid（行=2，列=0，列跨度=2，padx=5，pady=5）
+
+# 查询结果显示区域框架
+result_frame = tk.Frame(main_frame, bg="#FFFFFF")
+result_frame.grid(行=2，列=0，列跨度=2)
+
+label_result = tk.Label(result_frame, text="查询结果:", font=("Arial", 12), bg="#FFFFFF")
+label_result.grid(行=0，列=0，列跨度=2，pady=10)
+
+text_result =scrolledtext.ScrolledText(result_frame，wrap=tk.WORD，宽度=40，高度=10，字体=(“Arial”，12))
+text_result.grid(行=1，列=0，列跨度=2，pady=10)
+text_result.config（状态=tk.DISABLED）
+
+# 调整窗口大小并显示
+中心窗口(根, 500, 300)
+根.mainloop ( )
